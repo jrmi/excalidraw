@@ -1603,6 +1603,10 @@ class App extends React.Component<any, AppState> {
         (event.button === POINTER_BUTTON.MAIN && isHoldingSpace))
     ) {
       isPanning = true;
+
+      let nextPastePrevented = false;
+      const isLinux = /Linux/.test(window.navigator.platform);
+
       document.documentElement.style.cursor = CURSOR_TYPE.GRABBING;
       let { clientX: lastX, clientY: lastY } = event;
       const onPointerMove = withBatchedUpdates((event: PointerEvent) => {
@@ -1610,6 +1614,24 @@ class App extends React.Component<any, AppState> {
         const deltaY = lastY - event.clientY;
         lastX = event.clientX;
         lastY = event.clientY;
+
+        /*
+         * Prevent paste event if we move while middle clicking on Linux.
+         * See issue #1383.
+         */
+        if (
+          isLinux &&
+          !nextPastePrevented &&
+          (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1)
+        ) {
+          nextPastePrevented = true;
+          const preventNextPaste = (e: ClipboardEvent) => {
+            document.body.removeEventListener("paste", preventNextPaste);
+            e.stopPropagation();
+          };
+
+          document.body.addEventListener("paste", preventNextPaste);
+        }
 
         this.setState({
           scrollX: normalizeScroll(
